@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id          String     @id @default(uuid())
+  name        String
+  email       String     @unique
+  username    String     @unique
+  password    String
+  role        String     @default("admin")
+  isActive    Boolean    @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  auditLogs   AuditLog[]
+
+  @@map("admins")
+}
+
+model Employee {
+  id                 String              @id @default(uuid())
+  employeeCode       String              @unique
+  fullName           String
+  email              String              @unique
+  mobile             String
+  username           String              @unique
+  password           String
+  department         String
+  designation        String
+  joiningDate        DateTime
+  profileImage       String?
+  isActive           Boolean             @default(true)
+  lastLoginAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  attendanceSessions AttendanceSession[]
+  breakSessions      BreakSession[]
+  capturedPhotos     CapturedPhoto[]
+  locations          EmployeeLocation[]
+  settings           EmployeeSettings?
+  stops              EmployeeStop[]
+  notifications      Notification[]
+  shopVisits         ShopVisit[]
+  trackingSessions   TrackingSession[]
+
+  @@index([employeeCode])
+  @@index([department])
+  @@index([isActive])
+  @@map("employees")
+}
+
+model EmployeeSettings {
+  id                    String   @id @default(uuid())
+  employeeId            String   @unique
+  dutyDuration          Int      @default(540)
+  breakAllowance        Int      @default(60)
+  trackingInterval      Int      @default(30)
+  minMovementDistance   Int      @default(20)
+  minGpsAccuracy        Int      @default(100)
+  stopDetectionRadius   Int      @default(50)
+  stopDetectionDuration Int      @default(10)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  employee              Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_settings")
+}
+
+model AttendanceSession {
+  id               String             @id @default(uuid())
+  employeeId       String
+  date             DateTime           @db.Date
+  punchInTime      DateTime
+  punchInLat       Float?
+  punchInLng       Float?
+  punchInAccuracy  Float?
+  punchOutTime     DateTime?
+  punchOutLat      Float?
+  punchOutLng      Float?
+  punchOutAccuracy Float?
+  grossDuration    Int?
+  totalBreakTime   Int?
+  netWorkingTime   Int?
+  excessBreakTime  Int?
+  status           String             @default("active")
+  deviceInfo       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  employee         Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  breakSessions    BreakSession[]
+  capturedPhotos   CapturedPhoto[]
+  locations        EmployeeLocation[]
+  stops            EmployeeStop[]
+  shopVisits       ShopVisit[]
+  trackingSessions TrackingSession[]
+
+  @@index([employeeId])
+  @@index([date])
+  @@index([status])
+  @@index([employeeId, date])
+  @@map("attendance_sessions")
+}
+
+model EmployeeLocation {
+  id              String            @id @default(uuid())
+  employeeId      String
+  attendanceId    String
+  latitude        Float
+  longitude       Float
+  accuracy        Float?
+  speed           Float?
+  heading         Float?
+  altitude        Float?
+  deviceTimestamp DateTime
+  serverTimestamp DateTime          @default(now())
+  locationSource  String            @default("gps")
+  trackingStatus  String            @default("active")
+  isOfflineSync   Boolean           @default(false)
+  batteryLevel    Int?
+  eventId         String?           @unique
+  attendance      AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@index([deviceTimestamp])
+  @@index([employeeId, attendanceId, deviceTimestamp])
+  @@map("employee_locations")
+}
+
+model EmployeeStop {
+  id            String            @id @default(uuid())
+  employeeId    String
+  attendanceId  String
+  latitude      Float
+  longitude     Float
+  accuracy      Float?
+  arrivalTime   DateTime
+  departureTime DateTime?
+  duration      Int?
+  isQualifying  Boolean           @default(false)
+  isUncertain   Boolean           @default(false)
+  sampleCount   Int               @default(0)
+  locationName  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  attendance    AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee      Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@index([arrivalTime])
+  @@map("employee_stops")
+}
+
+model BreakSession {
+  id             String            @id @default(uuid())
+  employeeId     String
+  attendanceId   String
+  startTime      DateTime
+  endTime        DateTime?
+  duration       Int?
+  isExcess       Boolean           @default(false)
+  excessDuration Int?
+  autoEnded      Boolean           @default(false)
+  endReason      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  attendance     AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee       Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@map("break_sessions")
+}
+
+model ShopVisit {
+  id           String            @id @default(uuid())
+  employeeId   String
+  attendanceId String
+  shopName     String?
+  description  String?           @db.Text
+  latitude     Float?
+  longitude    Float?
+  accuracy     Float?
+  visitTime    DateTime
+  createdAt    DateTime          @default(now())
+  photos       CapturedPhoto[]
+  attendance   AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee     Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@map("shop_visits")
+}
+
+model CapturedPhoto {
+  id               String            @id @default(uuid())
+  employeeId       String
+  attendanceId     String
+  shopVisitId      String?
+  shopName         String?
+  description      String?           @db.Text
+  imagePath        String
+  thumbnailPath    String?
+  latitude         Float?
+  longitude        Float?
+  accuracy         Float?
+  captureTimestamp DateTime
+  uploadTimestamp  DateTime          @default(now())
+  uploadStatus     String            @default("uploaded")
+  fileSize         Int?
+  mimeType         String?
+  attendance       AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shopVisit        ShopVisit?        @relation(fields: [shopVisitId], references: [id])
+
+  @@index([employeeId])
+  @@index([attendanceId])
+  @@index([shopVisitId], map: "captured_photos_shopVisitId_fkey")
+  @@map("captured_photos")
+}
+
+model TrackingSession {
+  id             String            @id @default(uuid())
+  employeeId     String
+  attendanceId   String
+  startTime      DateTime
+  endTime        DateTime?
+  status         String            @default("active")
+  totalPoints    Int               @default(0)
+  lastLatitude   Float?
+  lastLongitude  Float?
+  lastUpdateTime DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  attendance     AttendanceSession @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  employee       Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([attendanceId], map: "tracking_sessions_attendanceId_fkey")
+  @@map("tracking_sessions")
+}
+
+model SystemSettings {
+  id           String   @id @default(uuid())
+  settingKey   String   @unique
+  settingValue String
+  settingType  String   @default("string")
+  description  String?
+  category     String   @default("general")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique @db.VarChar(500)
+  userId    String
+  userType  String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  employeeId String?
+  title      String
+  message    String    @db.Text
+  type       String    @default("info")
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  adminId   String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+  admin     Admin?   @relation(fields: [adminId], references: [id])
+
+  @@index([adminId])
+  @@index([entity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
