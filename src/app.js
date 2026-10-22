@@ -20,8 +20,27 @@ const app = express();
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
+const corsOriginEnv = process.env.CORS_ORIGIN;
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow non-browser clients (such as Flutter mobile app, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // If not set, or set to wildcard/true, allow origin
+    if (!corsOriginEnv || corsOriginEnv === '*' || corsOriginEnv === 'true') {
+      return callback(null, true);
+    }
+
+    const allowedOrigins = corsOriginEnv.split(',').map(o => o.trim());
+    if (
+      allowedOrigins.includes(origin) ||
+      (allowedOrigins.some(o => o.includes('vercel.app')) && origin.endsWith('.vercel.app'))
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
+  },
   credentials: true
 }));
 
